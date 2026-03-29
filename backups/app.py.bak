@@ -1,0 +1,234 @@
+from flask import Flask, render_template, request, session, redirect, url_for, flash
+from deep_translator import GoogleTranslator
+import sqlite3
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+import os
+import g4f  # Using g4f directly for better reliability
+
+app = Flask(__name__)
+app.secret_key = 'crab_secret_key_123' # Change this in production
+
+# Use absolute path for database file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Railway persistent storage support
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    # Files in /app/data will persist if you add a Volume in Railway
+    DB_PATH = '/app/data/database.db'
+    # Automatically create the data folder if it doesn't exist
+    if not os.path.exists('/app/data'):
+        os.makedirs('/app/data')
+else:
+    DB_PATH = os.path.join(BASE_DIR, 'database.db')
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # Users table
+    c.execute('''CREATE TABLE IF NOT EXISTS users 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  username TEXT UNIQUE NOT NULL, 
+                  password_hash TEXT NOT NULL)''')
+    # History table with user_id
+    c.execute('''CREATE TABLE IF NOT EXISTS history 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  user_id INTEGER,
+                  query TEXT, 
+                  result TEXT, 
+                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (user_id) REFERENCES users (id))''')
+    conn.commit()
+    conn.close()
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# Login Required Decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route("/")
+def landing():
+    return render_template("home.html")
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        
+        conn = get_db_connection()
+        try:
+            conn.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
+                         (username, generate_password_hash(password)))
+            conn.commit()
+            flash("Account created! Please log in.", "success")
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            flash("Username already exists.", "error")
+        finally:
+            conn.close()
+            
+    return render_template("signup.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
+        
+        if user and check_password_hash(user['password_hash'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            return redirect(url_for('app_interface'))
+        else:
+            flash("Invalid username or password.", "error")
+            
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for('landing'))
+
+@app.route("/app")
+@login_required
+def app_interface():
+    conn = get_db_connection()
+    history = conn.execute('SELECT * FROM history WHERE user_id = ? ORDER BY timestamp DESC', 
+                           (session['user_id'],)).fetchall()
+    conn.close()
+    return render_template("index.html", history=history)
+
+@app.route("/run")
+@login_required
+def run():
+    query = request.args.get("query")
+    translate_req = request.args.get("translate") == "true"
+    detailed_req = request.args.get("detailed") == "true"
+    from_history = request.args.get("from_history") == "true"
+    result = ""
+    translation = ""
+
+    ai_success = False  # Initialize success flag
+    
+    try:
+        # Prepare the prompt based on user request
+        if detailed_req:
+            prompt = f"Provide a detailed and comprehensive explanation about '{query}' in 5 to 6 clear sentences."
+        else:
+            prompt = f"Provide a very concise summary about '{query}' in exactly 2 clear sentences."
+        
+        print(f"DEBUG: Attempting to query AI with prompt: {prompt[:50]}...")  # Debug
+        
+        # Try stable providers in sequence
+        providers = [
+            (g4f.Provider.DeepInfra, g4f.models.default),
+            (g4f.Provider.BlackboxPro, "gpt-4o"),
+            (g4f.Provider.ApiAirforce, "gpt-4o-mini"),
+            (g4f.Provider.PuterJS, g4f.models.default),
+        ]
+
+        for provider, model in providers:
+            try:
+                p_name = getattr(provider, '__name__', str(provider))
+                print(f"DEBUG: Trying provider {p_name}...")
+                response = g4f.ChatCompletion.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    provider=provider
+                )
+                if response and len(response.strip()) > 0:
+                    result = response
+                    ai_success = True
+                    print(f"DEBUG: {p_name} succeeded!")
+                    break
+                else:
+                    print(f"DEBUG: {p_name} returned empty response.")
+            except Exception as prov_error:
+                print(f"DEBUG: {type(prov_error).__name__} for {provider.__name__ if hasattr(provider, '__name__') else 'unknown'}: {str(prov_error)}")
+                continue
+        
+        if not ai_success:
+            result = "I'm having trouble connecting to the AI service right now. Please try again in a moment."
+        
+        # Only translate if AI was successful
+        if ai_success and translate_req and result and not detailed_req:
+            try:
+                translation = GoogleTranslator(source='auto', target='ta').translate(result)
+            except Exception as trans_error:
+                translation = ""  # Silently fail translation, keep English result
+            
+    except Exception as e:
+        print(f"OUTER Exception: {type(e).__name__}: {str(e)}")  # Debug
+        import traceback
+        traceback.print_exc()
+        result = "Something went wrong. Please try searching again."
+        ai_success = False
+
+    if query and result:
+        conn = get_db_connection()
+        
+        # Only save to history if it's a NEW successful search 
+        # (not from history, not an expansion, not a translation, and AI must have succeeded)
+        if ai_success and not from_history and not detailed_req and not translate_req:
+            conn.execute('INSERT INTO history (user_id, query, result) VALUES (?, ?, ?)', 
+                         (session['user_id'], query, result))
+            conn.commit()
+            
+        history = conn.execute('SELECT * FROM history WHERE user_id = ? ORDER BY timestamp DESC', 
+                               (session['user_id'],)).fetchall()
+        conn.close()
+    else:
+        conn = get_db_connection()
+        history = conn.execute('SELECT * FROM history WHERE user_id = ? ORDER BY timestamp DESC', 
+                               (session['user_id'],)).fetchall()
+        conn.close()
+
+    return render_template("index.html", 
+                         query=query,
+                         result=result, 
+                         translation=translation, 
+                         history=history, 
+                         translate_checked=translate_req,
+                         detailed_checked=detailed_req,
+                         ai_success=ai_success)
+
+@app.route("/delete_history/<int:id>", methods=["POST"])
+@login_required
+def delete_history(id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM history WHERE id = ? AND user_id = ?', (id, session['user_id']))
+    conn.commit()
+    conn.close()
+    return "OK"
+
+@app.route("/delete_all_history", methods=["POST"])
+@login_required
+def delete_all_history():
+    conn = get_db_connection()
+    conn.execute('DELETE FROM history WHERE user_id = ?', (session['user_id'],))
+    conn.commit()
+    conn.close()
+    return "OK"
+
+init_db()
+
+if __name__ == "__main__":
+    app.run(debug=True)

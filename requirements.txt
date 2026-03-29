@@ -1,0 +1,11 @@
+g4f
+flask
+werkzeug
+gunicorn
+deep-translator
+python-tgpt
+PyPDF2
+python-docx
+requests
+fpdf2
+groq

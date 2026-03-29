@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRAB 1.0 | Smart Voice Assistant</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #00f2fe;
+            --secondary-color: #4facfe;
+            --accent-purple: #a855f7;
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --user-bubble: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --shadow-glow: 0 0 30px rgba(0, 242, 254, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% -20%, #1e293b, #0f172a 80%);
+            min-height: 100vh;
+            color: #f1f5f9;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            letter-spacing: -0.01em;
+        }
+
+        /* Ambient Background Blobs - Premium Floating */
+        .blob {
+            position: absolute;
+            filter: blur(100px);
+            z-index: -1;
+            opacity: 0.4;
+            animation: float 20s infinite alternate ease-in-out;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate(50px, -50px) scale(1.1);
+            }
+
+            100% {
+                transform: translate(-30px, 40px) scale(0.9);
+            }
+        }
+
+        .blob-1 {
+            top: -10%;
+            left: -10%;
+            width: 600px;
+            height: 600px;
+            background: var(--primary-color);
+            border-radius: 50%;
+        }
+
+        .blob-2 {
+            bottom: -10%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: var(--secondary-color);
+            border-radius: 50%;
+            animation-duration: 25s;
+            animation-delay: -5s;
+        }
+
+        header {
+            padding: 2rem 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(30px);
+            background: rgba(15, 23, 42, 0.3);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(to right, #ffffff, var(--primary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo img {
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            filter: drop-shadow(0 0 15px rgba(0, 242, 254, 0.4));
+            border: 1px solid var(--glass-border);
+        }
+
+        .logo-text-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        #version-display {
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            opacity: 0;
+            transform: translateY(-5px);
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 4rem 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 5.5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 2rem;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to bottom, #ffffff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes heroFade {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .highlight {
+            background: var(--user-bubble);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.4rem;
+            color: #94a3b8;
+            max-width: 700px;
+            margin-bottom: 3.5rem;
+            line-height: 1.6;
+            animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 54px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            text-decoration: none;
+            color: #0f172a;
+            background: var(--user-bubble);
+            border-radius: 20px;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 30px rgba(0, 242, 254, 0.3);
+            animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 15px 45px rgba(0, 242, 254, 0.5);
+        }
+
+        .features {
+            display: flex;
+            gap: 2.5rem;
+            margin-top: 5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            padding: 2.5rem;
+            border-radius: 24px;
+            width: 320px;
+            backdrop-filter: blur(10px);
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: left;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.3));
+        }
+
+        .feature-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: white;
+            letter-spacing: -0.02em;
+        }
+
+        .creator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 100px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+            animation: heroFade 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .creator-badge .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+
+        .creator-badge strong {
+            color: var(--primary-color);
+        }
+
+        /* Navigation Buttons - Premium */
+        .nav-link {
+            text-decoration: none;
+            color: #94a3b8;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 8px 16px;
+            border-radius: 12px;
+            border: 1px solid transparent;
+        }
+
+        .nav-link:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--glass-border);
+        }
+
+        .nav-btn-primary {
+            text-decoration: none;
+            color: #0f172a;
+            background: var(--user-bubble);
+            padding: 10px 24px;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+            border: none;
+        }
+
+        .nav-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.4);
+        }
+
+        .nav-btn-danger {
+            text-decoration: none;
+            color: #f87171;
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 10px 24px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+
+        .nav-btn-danger:hover {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: white;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+        }
+
+        footer {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.95rem;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 4rem;
+        }
+
+        /* Responsive Design */
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+            }
+
+            .blob {
+                width: 300px;
+                height: 300px;
+                opacity: 0.3;
+            }
+
+            header {
+                padding: 1rem 1.5rem;
+                gap: 1rem;
+            }
+
+            .logo {
+                font-size: 1.5rem;
+            }
+
+            .logo img {
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+            }
+
+            nav {
+                gap: 8px !important;
+            }
+
+            .nav-link {
+                padding: 6px 10px;
+                font-size: 0.9rem;
+            }
+
+            .nav-btn-primary,
+            .nav-btn-danger {
+                padding: 8px 16px;
+                font-size: 0.9rem;
+            }
+
+            main {
+                padding: 3rem 20px;
+            }
+
+            h1 {
+                font-size: 2.8rem;
+                margin-top: 0.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            p.subtitle {
+                font-size: 1rem;
+                margin-bottom: 2.5rem;
+                padding: 0 10px;
+            }
+
+            .cta-button {
+                padding: 16px 36px;
+                font-size: 1.1rem;
+                width: 100%;
+                max-width: 320px;
+                justify-content: center;
+            }
+
+            .creator-badge {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 1rem;
+            }
+
+            .logo span {
+                display: none;
+                /* Hide text if extremely tight, or keep if brief */
+            }
+
+            h1 {
+                font-size: 2.4rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <header>
+        <div class="logo" onclick="toggleVersion()" style="cursor: pointer; user-select: none;">
+            <img src="{{ url_for('static', filename='crab_logo.png') }}" alt="Logo">
+            <div class="logo-text-wrapper">
+                <span style="line-height: 1;">CRAB</span>
+            </div>
+        </div>
+        <nav style="display: flex; gap: 12px; align-items: center;">
+            <a href="/about" class="nav-link">About</a>
+            {% if session.get('user_id') %}
+            <a href="/logout" class="nav-btn-danger">Logout</a>
+            {% else %}
+            <a href="/login" class="nav-link">Login</a>
+            <a href="/signup" class="nav-btn-primary">Sign Up</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main>
+        <div class="creator-badge">
+            <div class="dot"></div>
+            Created by <strong>Yahya</strong>
+        </div>
+        <h1>Next-Level <br> <span class="highlight">Assistant</span></span></h1>
+        <p class="subtitle">CRAB is the advanced AI assistant made by python and designed with more attractive
+            features for your comfortable interaction
+            .</p>
+
+        <a href="/app" class="cta-button">
+            Launch Crab
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+        </a>
+
+    </main>
+
+    <footer>
+        &copy; 2026 CRAB AI. Created by Yahya.
+    </footer>
+
+    <script>
+        function toggleVersion() {
+            const display = document.getElementById('version-display');
+            const isVisible = display.style.opacity === '1';
+            display.style.opacity = isVisible ? '0' : '1';
+            display.style.transform = isVisible ? 'translateY(-5px)' : 'translateY(2px)';
+        }
+    </script>
+</body>
+
+</html>

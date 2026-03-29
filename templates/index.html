@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRAB | AI</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #00f2fe;
+            --secondary-color: #4facfe;
+            --accent-purple: #a855f7;
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --user-bubble: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --ai-bubble: rgba(30, 41, 59, 0.7);
+            --shadow-glow: 0 0 20px rgba(0, 242, 254, 0.15);
+        }
+
+        /* Model Selector Styling */
+        .model-selector-wrapper {
+            position: relative;
+            margin-right: 15px;
+        }
+
+        .model-btn {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+            border: 1px solid var(--glass-border);
+            color: #f1f5f9;
+            padding: 10px 18px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+        }
+
+        .model-btn:hover {
+            border-color: var(--primary-color);
+            background: rgba(0, 242, 254, 0.08);
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .model-btn svg {
+            color: var(--primary-color);
+            filter: drop-shadow(0 0 5px var(--primary-color));
+        }
+
+        .model-dropdown {
+            position: absolute;
+            top: calc(100% + 12px);
+            left: 0;
+            min-width: 220px;
+            background: rgba(15, 23, 42, 0.98);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10005;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 242, 254, 0.05);
+            animation: dropdownEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .model-dropdown.show {
+            display: flex;
+        }
+
+        .model-option {
+            padding: 12px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .model-option:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .model-option.active {
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.2);
+        }
+
+        .model-option .model-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: white;
+        }
+
+        .model-option .model-desc {
+            font-size: 0.7rem;
+            color: #94a3b8;
+        }
+
+        .model-option.active .model-name {
+            color: var(--primary-color);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% -20%, #1e293b, #0f172a 80%);
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            color: #f1f5f9;
+            overflow: hidden;
+            letter-spacing: -0.01em;
+        }
+
+        .app-wrapper {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(15, 23, 42, 0.2);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            position: relative;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: rgba(15, 23, 42, 0.6);
+            border-left: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            backdrop-filter: blur(30px);
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        .sidebar.closed {
+            width: 0;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sidebar-toggle {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .sidebar-toggle:hover {
+            border-color: var(--primary-color);
+            background: rgba(0, 242, 254, 0.08);
+            box-shadow: var(--shadow-glow);
+            transform: translateY(-1px);
+        }
+
+        .close-sidebar {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            color: #94a3b8;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        .close-sidebar:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 4px;
+        }
+
+        .history-item {
+            padding: 14px 18px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            font-size: 0.88rem;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+        }
+
+        .history-item:hover {
+            background: rgba(0, 242, 254, 0.05);
+            border-color: var(--primary-color);
+            color: white;
+            transform: translateX(4px);
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.1);
+        }
+
+        .history-item.active {
+            background: rgba(0, 242, 254, 0.12);
+            border-color: var(--primary-color);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 0 20px rgba(0, 242, 254, 0.1);
+        }
+
+        .new-chat-btn {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 24px;
+            border-radius: 16px;
+            background: var(--user-bubble);
+            color: #0f172a;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2);
+        }
+
+        .new-chat-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.4);
+        }
+
+        .chat-item-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-del-btn {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            opacity: 0;
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        .chat-item-container:hover .chat-del-btn {
+            opacity: 1;
+        }
+
+        header {
+            position: relative;
+            z-index: 1000;
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(15, 23, 42, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-area img {
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            filter: drop-shadow(0 0 15px rgba(0, 242, 254, 0.4));
+            border: 1px solid var(--glass-border);
+        }
+
+        .logo-area h1 {
+            font-size: 2.4rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(to right, #ffffff, var(--primary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 16px 24px;
+            border-radius: 24px;
+            line-height: 1.6;
+            position: relative;
+            font-size: 0.95rem;
+            animation: messageEntry 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes messageEntry {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: var(--user-bubble);
+            color: #0f172a;
+            font-weight: 600;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 8px 30px rgba(0, 242, 254, 0.2);
+        }
+
+        .ai-message {
+            align-self: flex-start;
+            background: var(--ai-bubble);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-bottom-left-radius: 4px;
+            color: #e2e8f0;
+        }
+
+        .message-embed {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+            border-radius: 18px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 14px;
+            border: 1px solid var(--glass-border);
+            width: fit-content;
+            max-width: 100%;
+            transition: 0.3s;
+        }
+
+        .message-embed:hover {
+            border-color: var(--primary-color);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .embed-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .embed-icon.pdf { background: linear-gradient(135deg, #ff416c, #ff4b2b); }
+        .embed-icon.docx, .embed-icon.doc { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
+        .embed-icon.txt { background: linear-gradient(135deg, #606c88, #3f4c6b); }
+        .embed-icon.csv { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .embed-icon.json { background: linear-gradient(135deg, #f7971e, #ffd200); }
+        .embed-icon.py { background: linear-gradient(135deg, #3776ab, #ffde57); color: #3776ab; }
+        .embed-icon.js { background: linear-gradient(135deg, #f0db4f, #323330); color: #323330; }
+        .embed-icon.html { background: linear-gradient(135deg, #e34c26, #f06529); }
+        .embed-icon.css { background: linear-gradient(135deg, #264de4, #2965f1); }
+        .embed-icon.cpp, .embed-icon.c { background: linear-gradient(135deg, #00599c, #004482); }
+        .embed-icon.java { background: linear-gradient(135deg, #f8981d, #5382a1); }
+
+        .embed-details {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            overflow: hidden;
+        }
+
+        .embed-name {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: white;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+
+        .embed-type {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .chat-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: #94a3b8;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .input-area {
+            padding: 30px 40px 40px;
+            background: transparent;
+            position: relative;
+        }
+
+        #chat-form {
+            display: flex;
+            flex-direction: column;
+            background: rgba(30, 41, 59, 0.7);
+            padding: 10px;
+            border-radius: 28px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        button[type="submit"] {
+            background: var(--user-bubble);
+            color: #0f172a;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button[type="submit"].stop-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .typing {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 8px 20px;
+            border-radius: 20px;
+            align-self: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .dot {
+            width: 5px;
+            height: 5px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            animation: pulseDots 1.4s infinite alternate;
+        }
+
+        @keyframes pulseDots {
+            from { opacity: 0.3; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1.2); }
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            display: none;
+            align-items: center;
+        }
+
+        .upload-trigger {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: #94a3b8;
+            padding: 10px;
+            border-radius: 14px;
+            cursor: pointer;
+        }
+
+        .file-info {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            padding: 12px 16px;
+            border-radius: 16px;
+            margin: 0 auto 15px auto;
+            width: fit-content;
+        }
+
+        .file-icon-wrapper {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 800;
+        }
+
+        .file-icon-wrapper.pdf { background: linear-gradient(135deg, #ff416c, #ff4b2b); }
+        .file-icon-wrapper.docx { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
+        .file-icon-wrapper.txt { background: linear-gradient(135deg, #606c88, #3f4c6b); }
+
+        .markdown-body img {
+            max-width: min(100%, 560px);
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid var(--glass-border);
+            display: block;
+            margin: 8px 0 12px 0;
+        }
+
+        .voice-wave {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 14px;
+            margin-right: 8px;
+        }
+
+        .voice-wave .bar {
+            width: 3px;
+            background: currentColor;
+            border-radius: 2px;
+            height: 4px;
+        }
+
+        .voice-wave.active .bar {
+            animation: pulseWave 0.6s infinite ease-in-out alternate;
+        }
+
+        @keyframes pulseWave {
+            from { height: 4px; opacity: 0.5; }
+            to { height: 14px; opacity: 1; }
+        }
+
+        .controls-wrapper { position: relative; }
+        .controls-dropdown {
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 0;
+            min-width: 200px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 10000;
+        }
+
+        .controls-dropdown.show { display: flex; }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                right: 0;
+                top: 0;
+                height: 100%;
+                z-index: 10000;
+                transform: translateX(100%);
+            }
+            .sidebar:not(.closed) { transform: translateX(0); }
+            .sidebar.closed { transform: translateX(100%); opacity: 1; pointer-events: none; display: flex; }
+        }
+    </style>
+</head>
+
+<body data-active-chat-id="{{ active_chat_id | tojson }}">
+    <div class="app-wrapper">
+        <div class="container">
+            <header>
+                <div class="logo-area" onclick="toggleVersion()" style="cursor: pointer;">
+                    <img src="{{ url_for('static', filename='crab_logo.png') }}" alt="Logo">
+                    <div>
+                        <h1 style="line-height: 1;">CRAB</h1>
+                        <span id="version-display" style="font-size: 0.75rem; color: var(--primary-color); opacity: 0; transition: 0.4s;">VERSION 1.0</span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <div class="model-selector-wrapper">
+                        <button class="model-btn" onclick="toggleModelMenu(event)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                            <span id="current-model-display">CRAB 1.0</span>
+                        </button>
+                        <div class="model-dropdown" id="model-menu">
+                            <div class="model-option" data-model="gpt-4o" onclick="selectModel('gpt-4o', 'CRAB 2.0', 'High Performance')">
+                                <span class="model-name">CRAB 2.0</span>
+                                <span class="model-desc">Gemini 2.0 Flash powered</span>
+                            </div>
+                            <div class="model-option active" data-model="phind" onclick="selectModel('phind', 'CRAB 1.0', 'Balanced & Stable')">
+                                <span class="model-name">CRAB 1.0</span>
+                                <span class="model-desc">GPT-4 powered</span>
+                            </div>
+                        </div>
+                    </div>
+                    <span>Hello, <strong style="color: var(--primary-color);">{{ session.get('username') }}</strong></span>
+                    <a href="/" class="home-btn" title="Go to Home">Home</a>
+                    <div class="controls-wrapper">
+                        <button type="button" class="controls-btn" onclick="toggleControls(event)">Controls</button>
+                        <div class="controls-dropdown" id="controls-menu">
+                            <button type="button" onclick="toggleSidebar()">History</button>
+                            <a href="/logout">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="chat-window">
+                {% if not history %}
+                <div class="message ai-message" id="welcome-message">Hello! I am CRAB 1.0, Developed By Yahya 😊😊</div>
+                {% else %}
+                {% for item in history %}
+                <div class="message user-message" id="msg-u-{{ item.id }}">
+                    <div class="text-content">{{ item.query }}</div>
+                </div>
+                <div class="message ai-message" id="msg-a-{{ item.id }}">
+                    <div class="markdown-body content-raw" data-markdown="{{ item.result | forceescape }}">{{ item.result }}</div>
+                    <div class="chat-actions">
+                        <button type="button" class="action-btn" data-result="{{ item.result | forceescape }}" onclick="speakText(this, this.dataset.result)">Listen</button>
+                        <button type="button" class="action-btn" onclick="translateText(this.closest('.ai-message'))">Translate</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+
+            <div class="typing" id="typing-indicator">CRAB is thinking...</div>
+
+            <div class="file-info" id="file-info">
+                <div class="file-icon-wrapper" id="file-icon"></div>
+                <div class="file-details">
+                    <span class="file-name" id="attached-filename"></span>
+                    <span class="file-type" id="attached-filetype"></span>
+                </div>
+                <span class="remove-file" onclick="clearAttachment()">X</span>
+            </div>
+
+            <form class="input-area" id="chat-form">
+                <div class="input-row">
+                    <div class="upload-btn-wrapper" id="upload-wrapper">
+                        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt,.csv,.json,.py,.js,.html,.css,.c,.cpp,.java">
+                        <label for="file-input" class="upload-trigger">📎</label>
+                    </div>
+                    <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off" required>
+                    <button type="submit" id="send-stop-btn">SEND</button>
+                </div>
+            </form>
+        </div>
+
+        <aside class="sidebar closed" id="app-sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">History</span>
+                <button type="button" onclick="toggleSidebar()">X</button>
+            </div>
+            <button class="new-chat-btn" onclick="location.href='/new_chat'">+ New Chat</button>
+            <div class="history-list" id="sidebar-history">
+                {% for chat in chats %}
+                <div class="chat-item-container" onclick="location.href='/app/{{ chat.id }}'">
+                    <div class="history-item">{{ chat.title }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <button onclick="clearAllHistory()">Clear All</button>
+        </aside>
+    </div>
+
+    <script>
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const appSidebar = document.getElementById('app-sidebar');
+        let selectedModel = localStorage.getItem('selectedModel') || 'phind';
+        let currentChatId = JSON.parse(document.body.dataset.activeChatId);
+
+        function toggleSidebar() { appSidebar.classList.toggle('closed'); }
+        function toggleControls(e) { if(e) e.stopPropagation(); document.getElementById('controls-menu').classList.toggle('show'); }
+        function toggleModelMenu(e) { if(e) e.stopPropagation(); document.getElementById('model-menu').classList.toggle('show'); }
+        function toggleVersion() { const v = document.getElementById('version-display'); v.style.opacity = v.style.opacity === '1' ? '0' : '1'; }
+
+        function selectModel(model, label) {
+            selectedModel = model;
+            localStorage.setItem('selectedModel', model);
+            document.getElementById('current-model-display').innerText = label;
+            document.getElementById('model-menu').classList.remove('show');
+            const welcome = document.getElementById('welcome-message');
+            if (welcome) welcome.innerText = model === 'gpt-4o' ? "Hello! I Am Crab 2.0, Developed By Yahya 😊😊" : "Hello! I am CRAB 1.0, Developed By Yahya 😊😊";
+            document.getElementById('upload-wrapper').style.display = model === 'gpt-4o' ? 'flex' : 'none';
+        }
+
+        window.addEventListener('click', () => {
+            const cm = document.getElementById('controls-menu');
+            const mm = document.getElementById('model-menu');
+            if(cm) cm.classList.remove('show');
+            if(mm) mm.classList.remove('show');
+        });
+
+        let currentAudio = null;
+        function speakText(btn, text) {
+            window.speechSynthesis.cancel();
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            if (btn.classList.contains('speaking')) { btn.classList.remove('speaking'); return; }
+            const utterance = new SpeechSynthesisUtterance(text.replace(/<[^>]*>/g, ''));
+            const voices = window.speechSynthesis.getVoices();
+            utterance.voice = voices.find(v => v.name.includes('Ravi')) || voices[0];
+            utterance.onstart = () => btn.classList.add('speaking');
+            utterance.onend = () => btn.classList.remove('speaking');
+            window.speechSynthesis.speak(utterance);
+        }
+
+        async function translateText(div) {
+            const btn = div.querySelector('.action-btn');
+            const text = div.querySelector('.markdown-body').innerText;
+            btn.innerText = "Translating...";
+            const resp = await fetch('/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+            const data = await resp.json();
+            if (data.translation) {
+                const tDiv = document.createElement('div');
+                tDiv.style.color = "var(--primary-color)";
+                tDiv.innerHTML = marked.parse(data.translation);
+                div.appendChild(tDiv);
+                btn.style.display = "none";
+            }
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = userInput.value.trim();
+            if (!query) return;
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user-message';
+            userMsg.innerText = query;
+            chatWindow.appendChild(userMsg);
+            userInput.value = '';
+            typingIndicator.style.display = 'block';
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            try {
+                const url = `/run?query=${encodeURIComponent(query)}&ajax=true&model=${selectedModel}${currentChatId ? '&chat_id=' + currentChatId : ''}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                typingIndicator.style.display = 'none';
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'message ai-message';
+                aiMsg.innerHTML = `<div class="markdown-body">${marked.parse(data.result)}</div>`;
+                chatWindow.appendChild(aiMsg);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                if (!currentChatId && data.chat_id) {
+                    currentChatId = data.chat_id;
+                    window.history.pushState({}, '', `/app/${data.chat_id}`);
+                }
+            } catch (err) { console.error(err); typingIndicator.style.display = 'none'; }
+        });
+
+        document.querySelectorAll('.content-raw').forEach(el => {
+            el.innerHTML = DOMPurify.sanitize(marked.parse(el.getAttribute('data-markdown')));
+        });
+        selectModel(selectedModel, selectedModel === 'gpt-4o' ? 'CRAB 2.0' : 'CRAB 1.0');
+    </script>
+</body>
+</html>
