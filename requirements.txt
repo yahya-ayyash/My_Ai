@@ -9,3 +9,4 @@ python-docx
 requests
 fpdf2
 groq
+python-dotenv
