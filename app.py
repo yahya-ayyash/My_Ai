@@ -500,21 +500,21 @@ def run():
                 # FAST PATH for small talk - prioritize faster providers
                 providers = [
                     (g4f.Provider.PollinationsAI, "gemini"),
-                    (g4f.Provider.BlackboxPro, g4f.models.gpt_4o),
+                    (g4f.Provider.Blackbox, g4f.models.gpt_4o),
                     (g4f.Provider.AnyProvider, g4f.models.gemini),
                 ]
             else:
                 # CRAB 2.0: Gemini 2.0 Flash / GPT-4o Standard Path
                 providers = [
                     (g4f.Provider.PollinationsAI, "gemini"),
-                    (g4f.Provider.BlackboxPro, g4f.models.gpt_4o),
+                    (g4f.Provider.Blackbox, g4f.models.gpt_4o),
                     (g4f.Provider.AnyProvider, g4f.models.gemini_2_0_flash),
                     (g4f.Provider.AnyProvider, g4f.models.gpt_4o),
                 ]
         elif model_choice == "phind" or not model_choice:
             # CRAB 1.0: GPT-4 (via g4f as requested)
             providers = [
-                (g4f.Provider.BlackboxPro, g4f.models.gpt_4),
+                (g4f.Provider.Blackbox, g4f.models.gpt_4),
                 (g4f.Provider.AnyProvider, g4f.models.gpt_4),
             ]
             if is_small: # Always use gemini for small talk speed
@@ -527,7 +527,7 @@ def run():
             providers = [
                 (g4f.Provider.PollinationsAI, "gemini"),
                 (g4f.Provider.AnyProvider, g4f.models.default),
-                (g4f.Provider.BlackboxPro, g4f.models.gpt_4o),
+                (g4f.Provider.Blackbox, g4f.models.gpt_4o),
             ]
 
         # 3. Try obtaining a response from Groq first (Primary/Reliable)
