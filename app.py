@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Tools for making "decorators" (special functions that wrap other functions)
 from functools import wraps
 import os
+from dotenv import load_dotenv
 # Importing AI providers
 import g4f
 from pytgpt.phind import PHIND
@@ -26,8 +27,11 @@ import requests
 from urllib.parse import quote
 from groq import Groq
 
+# Load environment variables from .env file
+load_dotenv()
+
 # Initialize Groq client
-GROQ_API_KEY = "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"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
 # PyInstaller fix for --noconsole: redirect stdout/stderr to a dummy writer if they are None
@@ -497,14 +501,12 @@ def run():
                 providers = [
                     (g4f.Provider.PollinationsAI, "gemini"),
                     (g4f.Provider.BlackboxPro, g4f.models.gpt_4o),
-                    (g4f.Provider.ApiAirforce, g4f.models.gemini_2_0_flash),
                     (g4f.Provider.AnyProvider, g4f.models.gemini),
                 ]
             else:
                 # CRAB 2.0: Gemini 2.0 Flash / GPT-4o Standard Path
                 providers = [
                     (g4f.Provider.PollinationsAI, "gemini"),
-                    (g4f.Provider.ApiAirforce, g4f.models.gemini_2_0_flash),
                     (g4f.Provider.BlackboxPro, g4f.models.gpt_4o),
                     (g4f.Provider.AnyProvider, g4f.models.gemini_2_0_flash),
                     (g4f.Provider.AnyProvider, g4f.models.gpt_4o),
@@ -512,7 +514,6 @@ def run():
         elif model_choice == "phind" or not model_choice:
             # CRAB 1.0: GPT-4 (via g4f as requested)
             providers = [
-                (g4f.Provider.ApiAirforce, g4f.models.gpt_4),
                 (g4f.Provider.BlackboxPro, g4f.models.gpt_4),
                 (g4f.Provider.AnyProvider, g4f.models.gpt_4),
             ]
@@ -521,7 +522,6 @@ def run():
         elif model_choice == "gpt-4o-mini":
             providers = [
                 (g4f.Provider.PollinationsAI, g4f.models.gpt_4o_mini),
-                (g4f.Provider.ApiAirforce, g4f.models.gpt_4o_mini),
             ]
         else: # Generic fallback
             providers = [
